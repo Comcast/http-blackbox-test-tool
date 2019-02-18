@@ -1,0 +1,4 @@
+<?xml version='1.0'?>
+<adm:PlacementStatusAcknowledgement xmlns:core='http://www.scte.org/schemas/130-2/2008a/core' xmlns:adm='http://www.scte.org/schemas/130-3/2008a/adm' messageRef='315163c6-2b3c-4f97-a437-a175c1aad175' messageId='487ffd6f-c08e-4406-46a3-46c85b14daf9' version='1.0' identity='1ea15585-1075-4833-86c6-9321695b5ce4' system='psnproxy'>
+    <core:StatusCode class='0'/>
+</adm:PlacementStatusAcknowledgement>

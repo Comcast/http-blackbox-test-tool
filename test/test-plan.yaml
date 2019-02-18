@@ -1,0 +1,25 @@
+smoke-health:
+  request:
+    url: http://mock:8080/health
+    method: get
+  expectedResponse:
+    type: text
+    statusCode: 200
+    maxRetryCount: 2
+
+smoke-post-psn:
+  request:
+    url: http://mock:8080/psn
+    method: post
+    type: xml
+    filePath: test/psn_base64encoded.xml
+    headers:
+
+  expectedResponse:
+    type: xml
+    statusCode: 200
+#    xpath:
+#        "/blah" : "blo"
+#        "/blah/id" : "dummyId"
+    filePath: test/expected_psn_proxy_response.xml
+    headers:

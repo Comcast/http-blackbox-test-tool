@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<dummy dummy-attribute="dummy-value">
+    <nested-dummy>dummy-text</nested-dummy>
+    <nested-dummy2>dummy-text</nested-dummy2>
+    <dummy-with-attribute another-dummy-attribute="another-value">dummy-text</dummy-with-attribute>
+    <dummy-with-attribute2 another-dummy-attribute-2="another-value">dummy-text</dummy-with-attribute2>
+</dummy>

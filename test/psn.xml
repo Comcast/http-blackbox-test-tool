@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<adm:PlacementStatusNotification messageId="315163c6-2b3c-4f97-a437-a175c1aad175" identity="86CF2E98-AEBA-4C3A-A3D4-616CF7D74A79" version="1.1" system="QAMRDK" xmlns:adm="http://www.scte.org/schemas/130-3/2008a/adm" xmlns:core="http://www.scte.org/schemas/130-2/2008a/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <adm:PlayData identityADS="1EA15585-1075-4833-86C6-9321695B5CE4">
+        <adm:SystemContext>
+            <adm:Session>99a85d22-84f4-4eb8-9491-271059affce8</adm:Session>
+        </adm:SystemContext>
+        <adm:Client>
+            <adm:TerminalAddress type="DEVICEID">BC644BEC4FA0</adm:TerminalAddress>
+        </adm:Client>
+        <adm:SpotScopedEvents>
+            <adm:Spot>
+                <core:Content>
+                    <core:AssetRef assetID="CSAJ7002006800100000" providerID="spotlight.tv" />
+                </core:Content>
+            </adm:Spot>
+            <adm:Events>
+                <adm:PlacementStatusEvent time="2017-11-01T11:46:33.393-07:00" type="endPlacement" messageRef="51892aca-bc30-4cea-829a-6d8fbcc50d11">
+                    <adm:SpotNPT scale="1.0">30.0</adm:SpotNPT>
+                </adm:PlacementStatusEvent>
+            </adm:Events>
+        </adm:SpotScopedEvents>
+    </adm:PlayData>
+</adm:PlacementStatusNotification>
