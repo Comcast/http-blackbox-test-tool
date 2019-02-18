@@ -7,5 +7,4 @@ gem 'diffy'
 group :test do
   gem 'test-unit'
   gem 'webmock'
-
 end
