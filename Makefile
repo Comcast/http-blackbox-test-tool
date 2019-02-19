@@ -1,7 +1,3 @@
-ifndef REGISTRY
-$(error REGISTRY is not set)
-endif
-
 VERSION?=latest
 IMAGE_NAME=http-blackbox-test-tool
 IMAGE_PATH=${IMAGE_NAME}:${VERSION}
@@ -12,11 +8,11 @@ FULL_IMAGE_PATH=${REGISTRY}/${IMAGE_NAME}:${VERSION}
 shell:
 	docker run --privileged=true -v /var/run/docker.sock:/var/run/docker.sock -it ${IMAGE_NAME}:${VERSION} /bin/bash
 
-build:
+build: guard-REGISTRY
 	docker build -t ${IMAGE_NAME} .
 	docker tag ${IMAGE_NAME} ${REGISTRY}/${IMAGE_NAME}:${VERSION}
 
-push:
+push: guard-REGISTRY
 	docker push ${REGISTRY}/${IMAGE_NAME}:${VERSION}
 
 test:
@@ -26,3 +22,10 @@ run:
 	ruby docker_http_test.rb
 
 build-and-push: build push
+
+
+guard-%:
+	@ if [ "${${*}}" = "" ]; then \
+		echo "Environment variable [$*] not set"; \
+		exit 1; \
+	fi
