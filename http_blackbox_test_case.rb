@@ -3,7 +3,6 @@ require 'diffy'
 require 'nokogiri'
 require 'equivalent-xml'
 require 'json'
-require './validation_error.rb'
 
 class HttpBlackboxTestCase
   TOP_LEVEL_REQUIRED_FIELDS = %w(request expectedResponse)

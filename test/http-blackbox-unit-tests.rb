@@ -14,7 +14,7 @@ require 'webmock/test_unit'
 # test json doc
 #
 
-class UnitTest < Test::Unit::TestCase
+class TestBlackbox < Test::Unit::TestCase
   def setup
     @test_plan_from_yaml = YAML.load_file("#{__dir__}/test-plan.yaml")
     @test_case_simple_get =
@@ -208,6 +208,7 @@ class UnitTest < Test::Unit::TestCase
         }
   end
 
+
   def test_get_max_retry
     name = @test_case_simple_get.keys.first
     test_config = @test_case_simple_get[name]
@@ -379,6 +380,7 @@ class UnitTest < Test::Unit::TestCase
       test_case.execute
     end
   end
+
 
   def test_get_with_xml_response
     name = @test_case_get_request_xml_response.keys.first
@@ -559,6 +561,7 @@ class UnitTest < Test::Unit::TestCase
     headers.each {|header_name, header_value| return header_value if header_name.downcase == key_name.downcase}
     nil
   end
+
 
 
 end
