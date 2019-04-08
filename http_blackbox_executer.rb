@@ -3,16 +3,19 @@ require 'diffy'
 require 'nokogiri'
 require 'equivalent-xml'
 require 'json'
-require './validation_error.rb'
+require_relative 'validation_error'
+require_relative 'execution_error'
 
-class HttpBlackboxTestCase
+
+class HttpBlackboxExecuter
   TOP_LEVEL_REQUIRED_FIELDS = %w(request expectedResponse)
-  REQUIRED_REQUEST_FIELDS = %w(url method) # todo :type
-  OPTIONAL_REQUEST_FIELDS = %w(type filePath headers) # todo :type
+  REQUIRED_REQUEST_FIELDS = %w(url method)
+  OPTIONAL_REQUEST_FIELDS = %w(type filePath headers)
   ALL_REQUEST_FIELDS = REQUIRED_REQUEST_FIELDS | OPTIONAL_REQUEST_FIELDS
   REQUIRED_RESPONSE_FIELDS = %w(statusCode)
-  OPTIONAL_RESPONSE_FIELDS = %w(maxRetryCount filePath headers type ignoreAttributes ignoreElements)
+  OPTIONAL_RESPONSE_FIELDS = %w(maxRetryCount filePath headers type ignoreAttributes ignoreElements xpath)
   ALL_RESPONSE_FIELDS = REQUIRED_RESPONSE_FIELDS | OPTIONAL_RESPONSE_FIELDS
+  HTTP_METHODS = %w(post get delete patch put)
   attr_accessor :test_case_config
 
   def initialize(name, test_case_config)
@@ -52,6 +55,8 @@ class HttpBlackboxTestCase
     url = request_config['url']
     http_method = request_config['method']
     expected_status_code = expected_response_config['statusCode']
+    raise ValidationError.new "Test case [#{@name}], HTTP method #{http_method} invalid" unless HTTP_METHODS.include?(http_method.downcase)
+    # todo ----->  consolidate with http modify method req <-----
 
     case http_method
     when "get"
@@ -59,13 +64,11 @@ class HttpBlackboxTestCase
       payload = get_payload_from_config(request_config, "request")
       actual_response = handle_get_request(url, expected_status_code, max_retry_count, payload, request_config['headers'])
       test_response(actual_response, expected_response_config)
-    when "post"
+    else
       payload = get_payload_from_config(request_config, "request")
       #todo add in max_retry_count
-      actual_response = handle_post_request(url, expected_status_code, payload, request_config['headers'])
+      actual_response = handle_http_modify_method_request(url, http_method, expected_status_code, payload, request_config['headers'])
       test_response(actual_response, expected_response_config)
-    else
-      raise ValidationError.new("Test case [#{@name}], HTTP method #{http_method} unsupported (only get/post)")
     end
   end
 
@@ -79,6 +82,7 @@ class HttpBlackboxTestCase
     end
   end
 
+# todo ----->  consolidate with http modify method req <-----
   def handle_get_request(url, expectedHttpStatusCode, max_retry_count, payload, headers)
     puts "Sending Http get to #{url}..."
     begin
@@ -88,12 +92,14 @@ class HttpBlackboxTestCase
       #todo what should timeout be set to?  should this be conigurable?
       # configured headers need to be capitalized per ruby HTTP client
       response = RestClient::Request.execute(method: :get, url: url,
-                                             timeout: 2, payload: payload, headers: headers) {|response| response}
+                                             timeout: 2, payload: payload, headers: headers) {
+          |response| response
+      }
       raise ExecutionError.new "HTTP Response code [#{response.code}] received, expected [#{expectedHttpStatusCode}]" if response.code != expectedHttpStatusCode
       puts "Expected status code [#{expectedHttpStatusCode}] verified."
       return response
     rescue Exception => e
-      puts e
+      puts e.backtrace
       if (retries += 1) < max_retry_count
         sleep 1
         retry
@@ -103,9 +109,9 @@ class HttpBlackboxTestCase
 
   end
 
-  def handle_post_request(url, expectedHttpStatusCode, payload, headers)
-    puts "Sending Http post to #{url}..."
-    response = RestClient.post(url, payload, headers) {|response| response}
+  def handle_http_modify_method_request(url, method, expectedHttpStatusCode, payload, headers)
+    puts "Sending Http #{method} to #{url}..."
+    response = RestClient::Request.execute(method: method, url: url, payload: payload, headers: headers) {|response| response}
     raise ExecutionError.new("HTTP Response code [#{response.code}] received, expected [#{expectedHttpStatusCode}]") if response.code != expectedHttpStatusCode
     puts "Expected status code [#{expectedHttpStatusCode}] verified."
     response
@@ -126,7 +132,8 @@ class HttpBlackboxTestCase
       when 'xml'
         ignore_attributes = expected_response_config['ignoreAttributes']
         ignore_elements = expected_response_config['ignoreElements']
-        check_xml(actual_response_text, expected_response_text, ignore_attributes, ignore_elements)
+        xpath_config = expected_response_config['xpath']
+        check_xml(actual_response_text, expected_response_text, ignore_attributes, ignore_elements, xpath_config)
       when 'json'
         raise "not implemented"
       else
@@ -136,8 +143,7 @@ class HttpBlackboxTestCase
   end
 
   def check_headers(expected_headers, actual_response_headers)
-    return if ( expected_headers.nil? || expected_headers.empty?)
-    expected_headers.each do |expected_key, expected_value|
+    expected_headers&.each do |expected_key, expected_value|
       found = false
       actual_response_headers.each do |actual_key, actual_value|
         if actual_key.to_s.downcase == expected_key.downcase
@@ -167,26 +173,17 @@ class HttpBlackboxTestCase
     raise ExecutionError.new("Error, test failure.")
   end
 
-  def check_xml(actual_response_text, expected_response_text, ignore_attributes, ignore_elements)
-    actual_response_doc = Nokogiri::XML(actual_response_text) {|config| config.default_xml.noblanks}
-    expected_doc = Nokogiri::XML(expected_response_text) {|config| config.default_xml.noblanks}
-    equivalent = EquivalentXml.equivalent?(actual_response_doc, expected_doc, opts = {:element_order => false, :normalize_whitespace => true, :ignore_attr_values => ignore_attributes, :ignore_content => ignore_elements})
-    if equivalent
-      puts "Actual response matches expected response"
-    else
-      puts "start expected doc".center(80, "-")
-      puts expected_doc.to_s
-      puts "end expected doc".center(80, "-")
-      puts '-' * 80
-      puts "Error: actual response doesn't match expected response"
-      puts "start actual response".center(80, "-")
-      puts actual_response_doc.to_s
-      puts "end actual response".center(80, "-")
-      puts "differences ".center(80, "-")
-      puts Diffy::Diff.new(expected_doc.to_s, actual_response_doc.to_s)
-      raise ExecutionError.new("Error, test failure.")
+  def check_xpath(xml_text, xpath_config)
+    expected_doc = Nokogiri::XML(xml_text) {|config| config.default_xml.noblanks}
+    xpath_config&.each do |xpath, expected_value|
+      observed_value = expected_doc.xpath(xpath).to_s
+      raise ExecutionError.new "xpath expression [#{xpath}] expected [#{expected_value}], observed: [#{observed_value}]" unless observed_value == expected_value
     end
+  end
 
+  def check_xml(actual_response_text, expected_response_text, ignore_attributes, ignore_elements, xpath_config = nil)
+    check_expected_vs_actual(actual_response_text, expected_response_text, ignore_attributes, ignore_elements)
+    check_xpath(actual_response_text, xpath_config)
   end
 
   def check_json(actual_response, expected_response)
@@ -194,6 +191,29 @@ class HttpBlackboxTestCase
   end
 
   private
+
+  def check_expected_vs_actual(actual_response_text, expected_response_text, ignore_attributes, ignore_elements)
+    if expected_response_text
+      actual_response_doc = Nokogiri::XML(actual_response_text) {|config| config.default_xml.noblanks}
+      expected_doc = Nokogiri::XML(expected_response_text) {|config| config.default_xml.noblanks}
+      equivalent = EquivalentXml.equivalent?(actual_response_doc, expected_doc, opts = {:element_order => false, :normalize_whitespace => true, :ignore_attr_values => ignore_attributes, :ignore_content => ignore_elements})
+      if equivalent
+        puts "Actual response matches expected response"
+      else
+        puts "start expected doc".center(80, "-")
+        puts expected_doc.to_s
+        puts "end expected doc".center(80, "-")
+        puts '-' * 80
+        puts "Error: actual response doesn't match expected response"
+        puts "start actual response".center(80, "-")
+        puts actual_response_doc.to_s
+        puts "end actual response".center(80, "-")
+        puts "differences ".center(80, "-")
+        puts Diffy::Diff.new(expected_doc.to_s, actual_response_doc.to_s)
+        raise ExecutionError.new("Error, test failure.")
+      end
+    end
+  end
 
   def validate_response_config(test_name, response_config)
     REQUIRED_RESPONSE_FIELDS.each do |req_response_field|

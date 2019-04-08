@@ -52,7 +52,6 @@ bundle install
 ```
 
 ## TODO - NEED HELP!
-* test coverage!
 * current implementation is XML-centric.  Needs to better support plain text and have full support for JSON
 * XML support needs to be expanded:
   * xpath for attribute/element validation for both literal strings and regex
@@ -62,4 +61,8 @@ bundle install
   * HTTP headers to send
   * validate responses have HTTP Headers (exist and/or match)
 * build CI tooling to run in hosted CI + publish to docker registry
-* modify docker build so image is much smaller (currently > 500meg, way too big)
+* watch logs for pattern (how?)
+
+deploy http bb to remote k8s along with services?
+
+

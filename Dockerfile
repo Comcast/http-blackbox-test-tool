@@ -11,7 +11,7 @@ RUN apk add --update --virtual \
   && apk del build-base \
   && rm -rf /var/cache/apk/*
 COPY docker_http_test.rb .
-COPY http_blackbox_test_case.rb .
+COPY http_blackbox_executer.rb .
 COPY validation_error.rb .
 COPY execution_error.rb .
 RUN chmod +x docker_http_test.rb
