@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 require 'rubygems'
 require 'yaml'
-require './http_blackbox_test_case.rb'
+require './http_blackbox_executer.rb'
 require './execution_error.rb'
 
 DEBUG = ENV['DEBUG']
@@ -14,9 +14,9 @@ test_plan = YAML.load_file(test_plan_path)
 puts test_plan
 test_plan.each {|name, test_case|
   begin
-  test_case = HttpBlackboxTestCase.new(name, test_case)
-  #todo perhaps create and validate before executing any, execute in a new loop
-  test_case.execute
+    test_case = HttpBlackboxExecuter.new(name, test_case)
+    #todo perhaps create and validate before executing any, execute in a new loop
+    test_case.execute
   rescue Exception => e
     #todo if debug turned on pass print backtrace
     puts "Test failure in test case #{name}: #{e.message}\n"

@@ -1,0 +1,28 @@
+version: '3'
+services:
+  psn-sink:
+    container_name: "psn-sink"
+    image: registry.vipertv.net/viper-ace/psn-sink:1.2.0
+  psn-router:
+    container_name: "psn-router"
+    image: "${DOCKER_IMAGE}"
+    depends_on:
+      - psn-sink
+    environment:
+      - ENDPOINT=http://psn-sink:8000/sink
+  smoke:
+    container_name: "smoke"
+    image: registry.vipertv.net/viper-ace/http-blackboxer:latest
+    depends_on:
+      - psn-router
+    volumes:
+       - ${SMOKE_TEST_DIR}:/smoke-test
+    environment:
+      - TEST_DIR=/smoke-test
+      - DEBUG=true
+#  debug:
+#    container_name: "debug"
+#    image: registry.vipertv.net/viper-linear-routing/drone-ci:0.0.0
+#    volumes:
+#    - ${SMOKE_TEST_DIR}:/smoke-test
+#    command: pwd && ls

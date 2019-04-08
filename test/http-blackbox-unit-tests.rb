@@ -1,4 +1,4 @@
-require_relative "../http_blackbox_test_case.rb"
+require_relative "../http_blackbox_executer.rb"
 require_relative "../validation_error"
 require_relative "../execution_error"
 
@@ -113,6 +113,27 @@ class TestBlackbox < Test::Unit::TestCase
                 }
         }
 
+    @test_case_put_request_payload =
+        {
+            testCase:
+                {
+                    request: {
+                        url: "http://sampleurl/psn",
+                        filePath: "#{__dir__}/psn.xml",
+                        method: "put",
+                        type: "text"
+
+                    },
+                    expectedResponse: {
+                        maxRetryCount: 2,
+                        statusCode: 201,
+                        filePath: "#{__dir__}/pass",
+                        type: "text"
+                    }
+                }
+        }
+
+
     @test_case_get_request_xml_response =
         {
             testCase:
@@ -206,13 +227,71 @@ class TestBlackbox < Test::Unit::TestCase
                     }
                 }
         }
+
+
+    @test_case_request_xml_with_xpath =
+        {
+            testCase:
+                {
+                    request: {
+                        url: "http://sampleurl/psn",
+                        method: "get"
+
+                    },
+                    expectedResponse: {
+                        maxRetryCount: 2,
+                        statusCode: 200,
+                        filePath: "#{__dir__}/response.xml",
+                        ignoreElements: ['nested-dummy2', 'dummy-with-attribute2'],
+                        type: "xml",
+                        xpath: {"/dummy/dummy-with-attribute/@another-dummy-attribute": "another-value",
+                                "/dummy/nested-dummy2/text()": "dummy-text"
+                        },
+                    }
+                }
+        }
+
   end
 
+  def test_get_with_xml_response_and_xpath
+    name = @test_case_request_xml_with_xpath.keys.first
+    test_config = @test_case_request_xml_with_xpath[name]
+    test_case = HttpBlackboxExecuter.new(name, test_config)
+    assert_not_nil test_case
+    response_xml = IO.read("#{__dir__}/response.xml")
+    stub_request(:get, "http://sampleurl/psn").to_return(lambda do |_|
+      return {
+          body: response_xml,
+          status: 200
+      }
+    end)
+    assert_nothing_raised do
+      test_case.execute
+    end
+  end
+
+  def test_get_with_xml_response_and_xpath_value_mismatch
+    name = @test_case_request_xml_with_xpath.keys.first
+    test_config = @test_case_request_xml_with_xpath[name]
+    test_config[:expectedResponse][:xpath][:"/dummy/dummy-with-attribute/@another-dummy-attribute"]="blah"
+    test_case = HttpBlackboxExecuter.new(name, test_config)
+    assert_not_nil test_case
+    response_xml = IO.read("#{__dir__}/response.xml")
+    stub_request(:get, "http://sampleurl/psn").to_return(lambda do |_|
+      return {
+          body: response_xml,
+          status: 200
+      }
+    end)
+    assert_raise do
+      test_case.execute
+    end
+  end
 
   def test_get_max_retry
     name = @test_case_simple_get.keys.first
     test_config = @test_case_simple_get[name]
-    test_case = HttpBlackboxTestCase.new(name, test_config)
+    test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     assert_raise do
       test_case.execute
@@ -222,7 +301,7 @@ class TestBlackbox < Test::Unit::TestCase
   def test_health_bad_http_code
     name = @test_case_simple_get.keys.first
     test_config = @test_case_simple_get[name]
-    test_case = HttpBlackboxTestCase.new(name, test_config)
+    test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     stub_request(:get, "http://sampleurl/health").to_return(status: 500)
     assert_raise do
@@ -233,7 +312,7 @@ class TestBlackbox < Test::Unit::TestCase
   def test_simple_get_health
     name = @test_case_simple_get.keys.first
     test_config = @test_case_simple_get[name]
-    test_case = HttpBlackboxTestCase.new(name, test_config)
+    test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     stub_request(:get, "http://sampleurl/health").to_return(status: 200)
     test_case.execute
@@ -244,7 +323,7 @@ class TestBlackbox < Test::Unit::TestCase
     test_config = @test_case_simple_get[name]
     test_config[:blah] = :blo
     assert_raise(ValidationError) do
-      HttpBlackboxTestCase.new(name, test_config)
+      HttpBlackboxExecuter.new(name, test_config)
     end
   end
 
@@ -253,7 +332,7 @@ class TestBlackbox < Test::Unit::TestCase
     test_config = @test_case_simple_get[name]
     test_config.delete(:request)
     assert_raise(ValidationError) do
-      HttpBlackboxTestCase.new(name, test_config)
+      HttpBlackboxExecuter.new(name, test_config)
     end
   end
 
@@ -262,7 +341,7 @@ class TestBlackbox < Test::Unit::TestCase
     test_config = @test_case_simple_get[name]
     test_config = test_config.delete(:response)
     assert_raise do
-      HttpBlackboxTestCase.new(name, test_config)
+      HttpBlackboxExecuter.new(name, test_config)
     end
   end
 
@@ -271,7 +350,7 @@ class TestBlackbox < Test::Unit::TestCase
     test_config = @test_case_simple_get[name]
     test_config[:request].delete(:url)
     assert_raise(ValidationError) do
-      HttpBlackboxTestCase.new(name, test_config)
+      HttpBlackboxExecuter.new(name, test_config)
     end
   end
 
@@ -280,7 +359,7 @@ class TestBlackbox < Test::Unit::TestCase
     test_config = @test_case_simple_get[name]
     test_config[:request].delete(:method)
     assert_raise(ValidationError) do
-      HttpBlackboxTestCase.new(name, test_config)
+      HttpBlackboxExecuter.new(name, test_config)
     end
   end
 
@@ -289,7 +368,7 @@ class TestBlackbox < Test::Unit::TestCase
     test_config = @test_case_get_request_payload[name]
     test_config[:request].delete(:type)
     assert_raise(ValidationError) do
-      HttpBlackboxTestCase.new(name, test_config)
+      HttpBlackboxExecuter.new(name, test_config)
     end
   end
 
@@ -298,7 +377,7 @@ class TestBlackbox < Test::Unit::TestCase
     test_config = @test_case_get_request_payload[name]
     test_config[:expectedResponse].delete(:type)
     assert_raise(ValidationError) do
-      HttpBlackboxTestCase.new(name, test_config)
+      HttpBlackboxExecuter.new(name, test_config)
     end
 
   end
@@ -306,7 +385,7 @@ class TestBlackbox < Test::Unit::TestCase
   def test_get_with_payload
     name = @test_case_get_request_payload.keys.first
     test_config = @test_case_get_request_payload[name]
-    test_case = HttpBlackboxTestCase.new(name, test_config)
+    test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     stub_request(:get, "http://sampleurl/psn").to_return(lambda do |request|
       result = (request.body.include? "1EA15585-1075-4833-86C6-9321695B5CE4") ? "pass" : "fail"
@@ -328,10 +407,38 @@ class TestBlackbox < Test::Unit::TestCase
     end
   end
 
+  def test_all_methods_with_payload
+    HttpBlackboxExecuter::HTTP_METHODS.each do |method|
+      name = @test_case_put_request_payload.keys.first
+      test_config = @test_case_get_request_payload[name]
+      test_config[:request][:method] = method
+      test_case = HttpBlackboxExecuter.new(name, test_config)
+      assert_not_nil test_case
+      stub_request(method.to_sym, "http://sampleurl/psn").to_return(lambda do |request|
+        result = (request.body.include? "1EA15585-1075-4833-86C6-9321695B5CE4") ? "pass" : "fail"
+        return {
+            body: result
+        }
+      end)
+      assert_nothing_raised do
+        test_case.execute
+      end
+      stub_request(method.to_sym, "http://sampleurl/psn").to_return(lambda do |request|
+        result = (request.body.include? "text-that-will-not-match") ? "pass" : "fail"
+        return {
+            body: result
+        }
+      end)
+      assert_raise(ExecutionError) do
+        test_case.execute
+      end
+    end
+  end
+
   def test_post_with_request_payload
     name = @test_case_post_request_no_response_payload.keys.first
     test_config = @test_case_post_request_no_response_payload[name]
-    test_case = HttpBlackboxTestCase.new(name, test_config)
+    test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     stub_request(:post, "http://sampleurl/psn").to_return(lambda do |_|
       return {
@@ -356,7 +463,7 @@ class TestBlackbox < Test::Unit::TestCase
   def test_post_with_request_and_response_payload
     name = @test_case_post_request_with_response_payload.keys.first
     test_config = @test_case_post_request_with_response_payload[name]
-    test_case = HttpBlackboxTestCase.new(name, test_config)
+    test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     stub_request(:post, "http://sampleurl/psn").to_return(lambda do |request|
       result = (request.body.include? "1EA15585-1075-4833-86C6-9321695B5CE4") ? "pass" : "fail"
@@ -385,7 +492,7 @@ class TestBlackbox < Test::Unit::TestCase
   def test_get_with_xml_response
     name = @test_case_get_request_xml_response.keys.first
     test_config = @test_case_get_request_xml_response[name]
-    test_case = HttpBlackboxTestCase.new(name, test_config)
+    test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     response_xml = IO.read("#{__dir__}/response.xml")
     stub_request(:get, "http://sampleurl/psn").to_return(lambda do |_|
@@ -497,7 +604,7 @@ class TestBlackbox < Test::Unit::TestCase
   def get_test_case_from_json(test_case_json)
     name = test_case_json.keys.first
     test_config = test_case_json[name]
-    test_case = HttpBlackboxTestCase.new(name, test_config)
+    test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     return test_case
   end
@@ -548,7 +655,6 @@ class TestBlackbox < Test::Unit::TestCase
     assert_raise(ExecutionError) do
       test_case.execute
     end
-
   end
 
   private
