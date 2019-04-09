@@ -1,0 +1,9 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: pswenson/alpine-ruby-base:0.1.0
+    steps:
+      - checkout
+      - run: "bundle install"
+      - run: "make test"
