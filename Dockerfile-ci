@@ -1,0 +1,9 @@
+FROM ruby:2.6.1-alpine
+
+RUN apk add --update \
+  build-base \
+  bash \
+  bash-completion \
+  git \
+  curl \
+  ruby-nokogiri
