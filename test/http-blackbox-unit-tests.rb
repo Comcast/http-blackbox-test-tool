@@ -251,6 +251,26 @@ class TestBlackbox < Test::Unit::TestCase
                 }
         }
 
+    @test_case_request_text_with_regex =
+        {
+            testCase:
+                {
+                    request: {
+                        url: "http://sampleurl/metrics",
+                        method: "get"
+                    },
+                    expectedResponse: {
+                        debug: true,
+                        statusCode: 200,
+                        type: "text",
+                        regex: {'psnrouter_client_connection_error_count{.*} (\d)': "1",
+                                'psnrouter_backend_request_duration_seconds_sum{product="PRODUCT!",reuse="false",site="PHIL!",url="localhost:7070/endpoint500"}': true,
+                                'psnrouter_client_connection_error_count{.*} (\d)': 1  #make sure it works for both a string and an int on regex match
+                        },
+                    }
+                }
+        }
+
   end
 
   def test_get_with_xml_response_and_xpath
@@ -273,7 +293,7 @@ class TestBlackbox < Test::Unit::TestCase
   def test_get_with_xml_response_and_xpath_value_mismatch
     name = @test_case_request_xml_with_xpath.keys.first
     test_config = @test_case_request_xml_with_xpath[name]
-    test_config[:expectedResponse][:xpath][:"/dummy/dummy-with-attribute/@another-dummy-attribute"]="blah"
+    test_config[:expectedResponse][:xpath][:"/dummy/dummy-with-attribute/@another-dummy-attribute"] = "blah"
     test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
     response_xml = IO.read("#{__dir__}/response.xml")
@@ -657,6 +677,24 @@ class TestBlackbox < Test::Unit::TestCase
     end
   end
 
+  def test_regex
+    name = @test_case_request_xml_with_xpath.keys.first
+    test_config = @test_case_request_text_with_regex[name]
+    test_case = HttpBlackboxExecuter.new("testcaseregex", test_config)
+    assert_not_nil test_case
+    response = IO.read("#{__dir__}/prometheus-metrics")
+    stub_request(:get, "http://sampleurl/metrics").to_return(lambda do |_|
+      return {
+          body: response,
+          status: 200
+      }
+    end)
+    assert_nothing_raised do
+      test_case.execute
+    end
+
+  end
+
   private
 
   def get_xml_doc(response_xml)
@@ -667,7 +705,6 @@ class TestBlackbox < Test::Unit::TestCase
     headers.each {|header_name, header_value| return header_value if header_name.downcase == key_name.downcase}
     nil
   end
-
 
 
 end

@@ -13,7 +13,7 @@ class HttpBlackboxExecuter
   OPTIONAL_REQUEST_FIELDS = %w(type filePath headers)
   ALL_REQUEST_FIELDS = REQUIRED_REQUEST_FIELDS | OPTIONAL_REQUEST_FIELDS
   REQUIRED_RESPONSE_FIELDS = %w(statusCode)
-  OPTIONAL_RESPONSE_FIELDS = %w(maxRetryCount filePath headers type ignoreAttributes ignoreElements xpath)
+  OPTIONAL_RESPONSE_FIELDS = %w(maxRetryCount filePath headers type ignoreAttributes ignoreElements xpath regex debug)
   ALL_RESPONSE_FIELDS = REQUIRED_RESPONSE_FIELDS | OPTIONAL_RESPONSE_FIELDS
   HTTP_METHODS = %w(post get delete patch put)
   attr_accessor :test_case_config
@@ -52,6 +52,7 @@ class HttpBlackboxExecuter
   end
 
   def execute_request(request_config, expected_response_config)
+    #TODO debug for request!
     url = request_config['url']
     http_method = request_config['method']
     expected_status_code = expected_response_config['statusCode']
@@ -117,11 +118,39 @@ class HttpBlackboxExecuter
     response
   end
 
+  def check_regex(regex_config, actual_response_text)
+    regex_config&.each do |regex_string, expected_value|
+      # if value is a boolean then only check to see if the regex matches
+      regex = Regexp.new regex_string
+      match = regex.match(actual_response_text)
+      if  [TrueClass, FalseClass].include? expected_value.class # check if boolean (NOT string like "true")
+        unless match && expected_value
+          raise ExecutionError.new "assertion failure: regular expression /#{regex_string}/ match [#{expected_value}] for text: [#{truncate actual_response_text, 150}]"
+        end
+      else
+        raise ExecutionError.new "assertion failure: no regular expression /#{regex_string}/ match [#{expected_value}] for text: " +
+                                     " [#{truncate actual_response_text, 50}]" if match.nil?
+        raise ExecutionError.new "assertion failure: regular expression matched, but no value found (regular expressions with a value need a grouping) " +
+                                     " /#{regex_string}/ match [#{expected_value}] for text: [#{truncate actual_response_text, 150}]" if match.size < 2
+        raise ExecutionError.new "assertion failure: regular expression matched, value mismatch " +
+                                     "(regular expressions with a value need a grouping) /#{regex_string}/ match [#{expected_value}] for text: [#{truncate actual_response_text, 150}]" if match[1] != expected_value.to_s
+
+      end
+    end
+  end
+
   def test_response(actual_response, expected_response_config)
     #if no filePath is specified in the expected_response_config then nothing to test
+    debug = expected_response_config['debug']
+    if (debug)
+      puts "::start debug-response::".center(120, "-")
+      puts actual_response
+      puts "::end debug-response::".center(120, "-")
+    end
     expected_response_path = expected_response_config['filePath']
     actual_response_text = actual_response.body
     check_headers(expected_response_config['headers'], actual_response.raw_headers)
+    check_regex(expected_response_config['regex'], actual_response_text)
     unless expected_response_path.nil?
       type = expected_response_config['type']
       raise ValidationError.new("expected response missing [type], valid values:  valid: ['text', 'json', 'xml']") if type.nil?
@@ -139,6 +168,7 @@ class HttpBlackboxExecuter
       else
         raise ValidationError.new("invalid response type: [#{expected_response_config['type']}] , valid: ['text', 'json', 'xml']")
       end
+
     end
   end
 
@@ -215,6 +245,7 @@ class HttpBlackboxExecuter
     end
   end
 
+  #todo all validation should happen up front, not during execution!
   def validate_response_config(test_name, response_config)
     REQUIRED_RESPONSE_FIELDS.each do |req_response_field|
       raise ValidationError.new "test-plan.yaml: Error in [#{test_name}], required response config key [#{req_response_field}] missing.  required: #{REQUIRED_RESPONSE_FIELDS}" unless response_config.keys.include? req_response_field.to_s
@@ -244,6 +275,10 @@ class HttpBlackboxExecuter
       raise ValidationError.new "test-plan.yaml: Error in [#{test_name}], request field [filePath] is missing. It is required if a [type] is configured." unless request_config.keys.include?('type')
     end
 
+  end
+
+  def truncate(string, max)
+    string.length > max ? "#{string[0...max]}..." : string
   end
 end
 
