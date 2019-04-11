@@ -260,10 +260,12 @@ class TestBlackbox < Test::Unit::TestCase
                         method: "get"
                     },
                     expectedResponse: {
+                        debug: true,
                         statusCode: 200,
                         type: "text",
                         regex: {'psnrouter_client_connection_error_count{.*} (\d)': "1",
-                                'psnrouter_backend_request_duration_seconds_sum{product="PRODUCT!",reuse="false",site="PHIL!",url="localhost:7070/endpoint500"}': true
+                                'psnrouter_backend_request_duration_seconds_sum{product="PRODUCT!",reuse="false",site="PHIL!",url="localhost:7070/endpoint500"}': true,
+                                'psnrouter_client_connection_error_count{.*} (\d)': 1  #make sure it works for both a string and an int on regex match
                         },
                     }
                 }
@@ -677,15 +679,8 @@ class TestBlackbox < Test::Unit::TestCase
 
   def test_regex
     name = @test_case_request_xml_with_xpath.keys.first
-
-
     test_config = @test_case_request_text_with_regex[name]
     test_case = HttpBlackboxExecuter.new("testcaseregex", test_config)
-
-    test_case
-
-
-
     assert_not_nil test_case
     response = IO.read("#{__dir__}/prometheus-metrics")
     stub_request(:get, "http://sampleurl/metrics").to_return(lambda do |_|
@@ -694,9 +689,9 @@ class TestBlackbox < Test::Unit::TestCase
           status: 200
       }
     end)
-    # assert_nothing_raised do
+    assert_nothing_raised do
       test_case.execute
-    # end
+    end
 
   end
 
