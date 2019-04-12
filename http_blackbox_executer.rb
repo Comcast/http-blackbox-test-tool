@@ -124,7 +124,7 @@ class HttpBlackboxExecuter
       regex = Regexp.new regex_string
       match = regex.match(actual_response_text)
       if  [TrueClass, FalseClass].include? expected_value.class # check if boolean (NOT string like "true")
-        unless match && expected_value
+        unless !!match == expected_value # both true or false
           raise ExecutionError.new "assertion failure: regular expression /#{regex_string}/ match [#{expected_value}] for text: [#{truncate actual_response_text, 150}]"
         end
       else
