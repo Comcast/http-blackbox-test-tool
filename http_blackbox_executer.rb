@@ -10,7 +10,7 @@ require_relative 'execution_error'
 class HttpBlackboxExecuter
   TOP_LEVEL_REQUIRED_FIELDS = %w(request expectedResponse)
   REQUIRED_REQUEST_FIELDS = %w(url method)
-  OPTIONAL_REQUEST_FIELDS = %w(type filePath headers)
+  OPTIONAL_REQUEST_FIELDS = %w(type filePath headers debug)
   ALL_REQUEST_FIELDS = REQUIRED_REQUEST_FIELDS | OPTIONAL_REQUEST_FIELDS
   REQUIRED_RESPONSE_FIELDS = %w(statusCode)
   OPTIONAL_RESPONSE_FIELDS = %w(maxRetryCount filePath headers type ignoreAttributes ignoreElements xpath regex debug)
@@ -52,7 +52,13 @@ class HttpBlackboxExecuter
   end
 
   def execute_request(request_config, expected_response_config)
-    #TODO debug for request!
+    debug = request_config['debug']
+    payload = get_payload_from_config(request_config, "request")
+    if debug && payload
+      puts "::start debug-request::".center(120, "-")
+      puts payload
+      puts "::end debug-request::".center(120, "-")
+    end
     url = request_config['url']
     http_method = request_config['method']
     expected_status_code = expected_response_config['statusCode']
@@ -62,11 +68,9 @@ class HttpBlackboxExecuter
     case http_method
     when "get"
       max_retry_count = expected_response_config['maxRetryCount'] || 0
-      payload = get_payload_from_config(request_config, "request")
       actual_response = handle_get_request(url, expected_status_code, max_retry_count, payload, request_config['headers'])
       test_response(actual_response, expected_response_config)
     else
-      payload = get_payload_from_config(request_config, "request")
       #todo add in max_retry_count
       actual_response = handle_http_modify_method_request(url, http_method, expected_status_code, payload, request_config['headers'])
       test_response(actual_response, expected_response_config)
