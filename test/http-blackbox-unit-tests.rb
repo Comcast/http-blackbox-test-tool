@@ -276,6 +276,27 @@ class TestBlackbox < Test::Unit::TestCase
                 }
         }
 
+
+    @test_case_request_with_count =
+        {
+            testCase:
+                {
+                    request: {
+                        url: "http://sampleurl/psn",
+                        method: "post",
+                        filePath: "#{__dir__}/psn.xml",
+                        count: 2,
+                        type: "text"
+                    },
+                    expectedResponse: {
+                        maxRetryCount: 2,
+                        statusCode: 201,
+                        filePath: "#{__dir__}/pass",
+                        type: "text"
+                    }
+                }
+        }
+
   end
 
   def test_get_with_xml_response_and_xpath
@@ -697,8 +718,29 @@ class TestBlackbox < Test::Unit::TestCase
     assert_nothing_raised do
       test_case.execute
     end
-
   end
+
+  def test_request_with_count
+    name = @test_case_request_with_count.keys.first
+    test_config = @test_case_request_with_count[name]
+    test_case = HttpBlackboxExecuter.new(name, test_config)
+    assert_not_nil test_case
+    execution_count = 0
+    stub_request(:post, "http://sampleurl/psn").to_return(lambda do |request|
+      execution_count += 1
+      result = "pass"
+      return {
+          body: result,
+          status: 201
+      }
+    end)
+    assert_nothing_raised do
+      test_case.execute
+    end
+    assert execution_count = test_case.test_case_config['request']['count']
+  end
+
+
 
   private
 
