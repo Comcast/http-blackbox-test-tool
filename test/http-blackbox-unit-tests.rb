@@ -257,17 +257,42 @@ class TestBlackbox < Test::Unit::TestCase
                 {
                     request: {
                         url: "http://sampleurl/metrics",
-                        method: "get"
+                        method: "get",
+                        type: "xml",
+                        debug: true,
+                        filePath: "#{__dir__}/psn.xml",
                     },
                     expectedResponse: {
                         debug: true,
                         statusCode: 200,
                         type: "text",
                         regex: {'psnrouter_client_connection_error_count{.*} (\d)': "1",
+                                'psnrouter_client_connection_error_count{path="localhost:7070/endpoint500",product="PRODUCT!",site="PHIL!"} (\d)': 1, #make sure it works for both a string and an int on regex match
                                 'psnrouter_backend_request_duration_seconds_sum{product="PRODUCT!",reuse="false",site="PHIL!",url="localhost:7070/endpoint500"}': true,
                                 'garbagethatdoesnotmatch': false,
-                                'psnrouter_client_connection_error_count{.*} (\d)': 1  #make sure it works for both a string and an int on regex match
+                                'psnrouter_backend_request_duration_seconds_sum{product="PRODUCT!",reuse="false",site="PHIL!",url="localhost:7070/endpoint500"} \d+.\d+': true
                         },
+                    }
+                }
+        }
+
+
+    @test_case_request_with_count =
+        {
+            testCase:
+                {
+                    request: {
+                        url: "http://sampleurl/psn",
+                        method: "post",
+                        filePath: "#{__dir__}/psn.xml",
+                        count: 2,
+                        type: "text"
+                    },
+                    expectedResponse: {
+                        maxRetryCount: 2,
+                        statusCode: 201,
+                        filePath: "#{__dir__}/pass",
+                        type: "text"
                     }
                 }
         }
@@ -679,7 +704,7 @@ class TestBlackbox < Test::Unit::TestCase
   end
 
   def test_regex
-    name =  @test_case_request_text_with_regex.keys.first
+    name = @test_case_request_text_with_regex.keys.first
     test_config = @test_case_request_text_with_regex[name]
     test_case = HttpBlackboxExecuter.new(name, test_config)
     assert_not_nil test_case
@@ -693,8 +718,29 @@ class TestBlackbox < Test::Unit::TestCase
     assert_nothing_raised do
       test_case.execute
     end
-
   end
+
+  def test_request_with_count
+    name = @test_case_request_with_count.keys.first
+    test_config = @test_case_request_with_count[name]
+    test_case = HttpBlackboxExecuter.new(name, test_config)
+    assert_not_nil test_case
+    execution_count = 0
+    stub_request(:post, "http://sampleurl/psn").to_return(lambda do |request|
+      execution_count += 1
+      result = "pass"
+      return {
+          body: result,
+          status: 201
+      }
+    end)
+    assert_nothing_raised do
+      test_case.execute
+    end
+    assert execution_count = test_case.test_case_config['request']['count']
+  end
+
+
 
   private
 

@@ -10,7 +10,7 @@ require_relative 'execution_error'
 class HttpBlackboxExecuter
   TOP_LEVEL_REQUIRED_FIELDS = %w(request expectedResponse)
   REQUIRED_REQUEST_FIELDS = %w(url method)
-  OPTIONAL_REQUEST_FIELDS = %w(type filePath headers)
+  OPTIONAL_REQUEST_FIELDS = %w(type filePath headers debug count)
   ALL_REQUEST_FIELDS = REQUIRED_REQUEST_FIELDS | OPTIONAL_REQUEST_FIELDS
   REQUIRED_RESPONSE_FIELDS = %w(statusCode)
   OPTIONAL_RESPONSE_FIELDS = %w(maxRetryCount filePath headers type ignoreAttributes ignoreElements xpath regex debug)
@@ -52,24 +52,32 @@ class HttpBlackboxExecuter
   end
 
   def execute_request(request_config, expected_response_config)
-    #TODO debug for request!
-    url = request_config['url']
-    http_method = request_config['method']
-    expected_status_code = expected_response_config['statusCode']
-    raise ValidationError.new "Test case [#{@name}], HTTP method #{http_method} invalid" unless HTTP_METHODS.include?(http_method.downcase)
-    # todo ----->  consolidate with http modify method req <-----
+    count = (request_config['count'] || 1).to_i
+    count.times do |current_count|
+      puts "Executing request #{current_count}/#{count}" if count > 1
+      debug = request_config['debug']
+      payload = get_payload_from_config(request_config, "request")
+      if debug && payload
+        puts "::start debug-request::".center(120, "-")
+        puts payload
+        puts "::end debug-request::".center(120, "-")
+      end
+      url = request_config['url']
+      http_method = request_config['method']
+      expected_status_code = expected_response_config['statusCode']
+      raise ValidationError.new "Test case [#{@name}], HTTP method #{http_method} invalid" unless HTTP_METHODS.include?(http_method.downcase)
+      # todo ----->  consolidate with http modify method req <-----
 
-    case http_method
-    when "get"
-      max_retry_count = expected_response_config['maxRetryCount'] || 0
-      payload = get_payload_from_config(request_config, "request")
-      actual_response = handle_get_request(url, expected_status_code, max_retry_count, payload, request_config['headers'])
-      test_response(actual_response, expected_response_config)
-    else
-      payload = get_payload_from_config(request_config, "request")
-      #todo add in max_retry_count
-      actual_response = handle_http_modify_method_request(url, http_method, expected_status_code, payload, request_config['headers'])
-      test_response(actual_response, expected_response_config)
+      case http_method
+      when "get"
+        max_retry_count = expected_response_config['maxRetryCount'] || 0
+        actual_response = handle_get_request(url, expected_status_code, max_retry_count, payload, request_config['headers'])
+        test_response(actual_response, expected_response_config)
+      else
+        #todo add in max_retry_count
+        actual_response = handle_http_modify_method_request(url, http_method, expected_status_code, payload, request_config['headers'])
+        test_response(actual_response, expected_response_config)
+      end
     end
   end
 
@@ -123,17 +131,18 @@ class HttpBlackboxExecuter
       # if value is a boolean then only check to see if the regex matches
       regex = Regexp.new regex_string
       match = regex.match(actual_response_text)
-      if  [TrueClass, FalseClass].include? expected_value.class # check if boolean (NOT string like "true")
+      # check if boolean (NOT string like "true")
+      if [TrueClass, FalseClass].include? expected_value.class
         unless !!match == expected_value # both true or false
           raise ExecutionError.new "assertion failure: regular expression /#{regex_string}/ match [#{expected_value}] for text: [#{truncate actual_response_text, 150}]"
         end
       else
-        raise ExecutionError.new "assertion failure: no regular expression /#{regex_string}/ match [#{expected_value}] for text: " +
-                                     " [#{truncate actual_response_text, 50}]" if match.nil?
+        raise ExecutionError.new "assertion failure: no regular expression /#{regex_string}/ match, expected value: [#{expected_value}], To see full response text turn [debug] on" if match.nil?
         raise ExecutionError.new "assertion failure: regular expression matched, but no value found (regular expressions with a value need a grouping) " +
-                                     " /#{regex_string}/ match [#{expected_value}] for text: [#{truncate actual_response_text, 150}]" if match.size < 2
-        raise ExecutionError.new "assertion failure: regular expression matched, value mismatch " +
-                                     "(regular expressions with a value need a grouping) /#{regex_string}/ match [#{expected_value}] for text: [#{truncate actual_response_text, 150}]" if match[1] != expected_value.to_s
+                                     " /#{regex_string}/ match, explected value: [#{expected_value}].  To see full response text turn [debug] on" if match.size < 2
+        observed_value = match[1]
+        raise ExecutionError.new "assertion failure: regular expression matched, value mismatch. \n" +
+                                     "regex: /#{regex_string}/, expected value: [#{expected_value}] , observed value: [#{observed_value}].  To see full response text turn [debug] on" if observed_value != expected_value.to_s
 
       end
     end
@@ -245,7 +254,7 @@ class HttpBlackboxExecuter
     end
   end
 
-  #todo all validation should happen up front, not during execution!
+#todo as much as possible validation should happen up front, not during execution!
   def validate_response_config(test_name, response_config)
     REQUIRED_RESPONSE_FIELDS.each do |req_response_field|
       raise ValidationError.new "test-plan.yaml: Error in [#{test_name}], required response config key [#{req_response_field}] missing.  required: #{REQUIRED_RESPONSE_FIELDS}" unless response_config.keys.include? req_response_field.to_s
