@@ -5,7 +5,7 @@ GEM
       public_suffix (>= 2.0.2, < 4.0)
     crack (0.4.3)
       safe_yaml (~> 1.0.0)
-    diffy (3.3.0)
+    diffy (3.4.1)
     domain_name (0.5.20180417)
       unf (>= 0.0.5, < 1.0.0)
     equivalent-xml (0.6.0)
